@@ -1,67 +1,50 @@
-import pandas as pd
+
 from splinter import Browser
-from bs4 import BeautifulSoup
-import requests
+from bs4 import BeautifulSoup as bs
+import time
 
-browser = Browser('chrome', headless=True)
 
-def newsScraper():
-    url = 'https://mars.nasa.gov/news/'
+def init_browser():
+    # @NOTE: Replace the path with your actual path to the chromedriver
+    executable_path = {"executable_path": "/usr/local/bin/chromedriver"}
+    return Browser("chrome", **executable_path, headless=False)
+
+
+def scrape_info():
+    browser = init_browser()
+
+    # Visit visitcostarica.herokuapp.com
+    url = "https://visitcostarica.herokuapp.com/"
     browser.visit(url)
-    source = browser.html
-    soup = BeautifulSoup(source, 'html.parser')
-    news_title = soup.find('div', class_='content_title').text.strip()
-    news_p = soup.find('div', class_='article_teaser_body').text.strip()
-    return [news_title, news_p]
 
+    time.sleep(1)
 
-def imageScaper():
-    url = 'https://www.jpl.nasa.gov/spaceimages/?search=&category=Mars'
-    browser.visit(url)
-    source = browser.html
-    soup = BeautifulSoup(source, "html.parser")
-    containers = soup.find_all('a', class_='fancybox')
-    container = containers[1]
-    image_url = container['data-fancybox-href']
-    image_url = 'https://www.jpl.nasa.gov' + image_url
-    return image_url
+    # Scrape page into Soup
+    html = browser.html
+    soup = bs(html, "html.parser")
 
-def tweetScraper():
-    url = 'https://twitter.com/marswxreport?lang=en'
-    source = requests.get(url)
-    soup = BeautifulSoup(source.content, 'html.parser')
-    tweet = soup.find('p', class_='tweet-text').text.strip()
-    return tweet
+    # Get the average temps
+    avg_temps = soup.find('div', id='weather')
 
-def tableScraper():
-    tables = pd.read_html('https://space-facts.com/mars/')
-    table = tables[0]
-    html_table = table.to_html()
-    return html_table
+    # Get the min avg temp
+    min_temp = avg_temps.find_all('strong')[0].text
 
-def hemisphereScraper():
-    results = []
-    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
-    browser.visit(url)
-    links = browser.find_by_tag('h3')
-    i = 0
-    for link in links:
-        browser.find_by_tag('h3')[i].click()
-        source = browser.html
-        soup = BeautifulSoup(source, "html.parser")
-        title = soup.find('h2').text
-        image_url = soup.find('div', class_='downloads').find('a')['href'].strip()
-        results.append({"title": title, "img_url": image_url})
-        browser.back()
-        i = i + 1
+    # Get the max avg temp
+    max_temp = avg_temps.find_all('strong')[1].text
 
-    return results
+    # BONUS: Find the src for the sloth image
+    relative_image_path = soup.find_all('img')[2]["src"]
+    sloth_img = url + relative_image_path
 
-def scrape_all():
-    results = {'news_title'   : newsScraper()[0],
-               'news_p'       : newsScraper()[1],
-               'image_scraped': imageScaper(),
-               'tweet_scraped': tweetScraper(),
-               'table_scraped': tableScraper(),
-               'hemispheres'  : hemisphereScraper()}
-    return results
+    # Store data in a dictionary
+    costa_data = {
+        "sloth_img": sloth_img,
+        "min_temp": min_temp,
+        "max_temp": max_temp
+    }
+
+    # Close the browser after scraping
+    browser.quit()
+
+    # Return results
+    return costa_data
